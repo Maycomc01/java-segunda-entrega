@@ -11,25 +11,56 @@ import com.coderhouse.models.Cliente;
 import com.coderhouse.services.ClienteService;
 import com.coderhouse.responses.ErrorResponses;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @RestController
-@RequestMapping("/cliente")
+@RequestMapping("/api/clientes")
+@Tag(name = "Gestion de Clientes", description = "Endpoints para gestionar la información de los clientes")
 public class ClienteController {
 
     @Autowired
     private ClienteService clienteService;
 
+
+    @Operation(summary = "Obtener la lista de Todos los Clientes")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de Clientes obtenida correctamente", content = {
+                    @Content(mediaType = "application/json", array = @ArraySchema(schema = @Schema(implementation = Cliente.class)))}),
+            @ApiResponse(responseCode = "500", description = "Error Interno de Servidor", content = @Content(
+                    mediaType = "application/json", schema = @Schema(implementation = ErrorResponses.class)))
+        })
     @GetMapping
-    public ResponseEntity<List<Cliente>> getAllCliente() {
+    public ResponseEntity<List<Cliente>> obtenerTodos() {
         try {
-            List<Cliente> cliente = clienteService.findAll();
-            return ResponseEntity.ok(cliente);
+            List<Cliente> clientes = clienteService.findAll();
+            return ResponseEntity.ok(clientes);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
     }
-
+    
+    
+    @Operation(summary = "Obtener un Cliente por su ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Cliente encontrado correctamente", content = {
+                    @Content(mediaType = "application/json", schema = @Schema(implementation = Cliente.class))}),
+            @ApiResponse(responseCode = "404", description = "Error al Obtener el Cliente (No encontrado)", content = @Content(
+                    mediaType = "application/json", schema = @Schema(implementation = ErrorResponses.class))),
+            @ApiResponse(responseCode = "500", description = "Error Interno de Servidor", content = @Content(
+                    mediaType = "application/json", schema = @Schema(implementation = ErrorResponses.class)))
+        })
     @GetMapping("/{id}")
-    public ResponseEntity<Cliente> getClienteById(@PathVariable Long id) {
+    public ResponseEntity<Cliente> obtenerPorId(
+            @Parameter(description = "Identificador del cliente", example = "1", required = true)
+            @PathVariable Long id) {
         try {
             Cliente cliente = clienteService.findById(id);
             return ResponseEntity.ok(cliente);
@@ -40,21 +71,68 @@ public class ClienteController {
         }
     }
 
+    
+    @Operation(summary = "Crear un Cliente nuevo")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Cliente creado correctamente", content = {
+                    @Content(mediaType = "application/json", schema = @Schema(implementation = Cliente.class))}),
+            @ApiResponse(responseCode = "409", description = "Error al intentar crear el Cliente - CONFLICT (DNI existente)", content = @Content(
+                    mediaType = "application/json", schema = @Schema(implementation = ErrorResponses.class))),
+            @ApiResponse(responseCode = "500", description = "Error Interno de Servidor", content = @Content(
+                    mediaType = "application/json", schema = @Schema(implementation = ErrorResponses.class)))
+        })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "Datos del cliente a crear",
+            required = true,
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                            name = "Cliente de Ejemplo",
+                            value = "{\"nombre\":\"Juan\",\"apellido\":\"Perez\",\"dni\":12345678,\"email\":\"juan.perez@test.com\"}"
+                    ),
+                    schema = @Schema(implementation = Cliente.class)
+            )
+    )
     @PostMapping
-    public ResponseEntity<?> createCliente(@RequestBody Cliente cliente) {
+    public ResponseEntity<?> crear(@RequestBody Cliente cliente) {
         try {
-            Cliente clienteCreado = clienteService.save(cliente);
-            return ResponseEntity.status(HttpStatus.CREATED).body(clienteCreado);
+            Cliente creado = clienteService.save(cliente);
+            return ResponseEntity.status(HttpStatus.CREATED).body(creado);
         } catch (IllegalStateException e) {
-            ErrorResponses error = new ErrorResponses("Conflicto", e.getMessage());
+            ErrorResponses error = new ErrorResponses("Conflicto de Datos", e.getMessage());
             return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
     }
 
+    
+    @Operation(summary = "Actualizar los datos de un Cliente por su ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Cliente actualizado correctamente", content = {
+                    @Content(mediaType = "application/json", schema = @Schema(implementation = Cliente.class))}),
+            @ApiResponse(responseCode = "404", description = "Error al obtener el Cliente (No encontrado)", content = @Content(
+                    mediaType = "application/json", schema = @Schema(implementation = ErrorResponses.class))),
+            @ApiResponse(responseCode = "500", description = "Error Interno de Servidor", content = @Content(
+                    mediaType = "application/json", schema = @Schema(implementation = ErrorResponses.class)))
+        })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "Datos del cliente a actualizar",
+            required = true,
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                            name = "Actualización de Email",
+                            value = "{\"email\":\"nuevo.email@test.com\"}"
+                    ),
+                    schema = @Schema(implementation = Cliente.class)
+            )
+    )
     @PutMapping("/{id}")
-    public ResponseEntity<Cliente> updateClienteById(@PathVariable Long id, @RequestBody Cliente clienteActualizado) {
+    public ResponseEntity<Cliente> actualizar(
+            @Parameter(description = "Identificador del cliente", example = "1", required = true)
+            @PathVariable Long id, 
+            @RequestBody Cliente clienteActualizado) {
         try {
             Cliente cliente = clienteService.update(id, clienteActualizado);
             return ResponseEntity.ok(cliente);
@@ -65,24 +143,61 @@ public class ClienteController {
         }
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteClienteById(@PathVariable Long id) {
+    
+    @Operation(summary = "Asociar una lista de Artículos a un Cliente (Favoritos)",
+               description = "Agrega uno o más IDs de artículos a la lista de favoritos del cliente.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Artículos asociados correctamente", content = {
+                    @Content(mediaType = "application/json", schema = @Schema(implementation = Cliente.class))}),
+            @ApiResponse(responseCode = "404", description = "Cliente o Artículo no encontrado", content = @Content(
+                    mediaType = "application/json", schema = @Schema(implementation = ErrorResponses.class))),
+            @ApiResponse(responseCode = "500", description = "Error Interno de Servidor", content = @Content(
+                    mediaType = "application/json", schema = @Schema(implementation = ErrorResponses.class)))
+        })
+    @PutMapping("/{id}/articulos")
+    public ResponseEntity<?> asociarArticulos(
+            @Parameter(description = "Identificador del cliente", example = "1", required = true)
+            @PathVariable Long id, 
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                description = "Lista de IDs de artículos a asociar",
+                required = true,
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "IDs de Artículos",
+                        value = "[1, 5, 8]"
+                    ),
+                    array = @ArraySchema(schema = @Schema(implementation = Long.class))
+                )
+            )
+            @RequestBody List<Long> articuloIds) {
         try {
-            clienteService.deleteById(id);
-            return ResponseEntity.noContent().build();
+            Cliente cliente = clienteService.asociarArticulos(id, articuloIds);
+            return ResponseEntity.ok(cliente);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+            ErrorResponses error = new ErrorResponses("Recurso No Encontrado", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error); // 404 Not Found
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
     }
 
-  
-    @PostMapping("/{id}/articulos")
-    public ResponseEntity<Cliente> asociarArticulos(@PathVariable Long id, @RequestBody List<Long> articuloIds) {
+    
+    @Operation(summary = "Eliminar un Cliente por su ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Cliente eliminado correctamente"),
+            @ApiResponse(responseCode = "404", description = "Error al obtener el Cliente (No encontrado)", content = @Content(
+                    mediaType = "application/json", schema = @Schema(implementation = ErrorResponses.class))),
+            @ApiResponse(responseCode = "500", description = "Error Interno de Servidor", content = @Content(
+                    mediaType = "application/json", schema = @Schema(implementation = ErrorResponses.class)))
+        })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> eliminar(
+            @Parameter(description = "Identificador del cliente", example = "1", required = true)
+            @PathVariable Long id) {
         try {
-            Cliente clienteActualizado = clienteService.asociarArticulos(id, articuloIds);
-            return ResponseEntity.ok(clienteActualizado);
+            clienteService.deleteById(id);
+            return ResponseEntity.noContent().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
